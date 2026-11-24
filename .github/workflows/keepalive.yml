@@ -1,0 +1,21 @@
+name: Datenbank wach halten
+
+# Kostenlose Supabase-Projekte pausieren nach 7 Tagen ohne Aktivität.
+# Dieser Job ruft alle 3 Tage eine harmlose Funktion auf.
+on:
+  schedule:
+    - cron: "17 5 */3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    if: ${{ vars.VITE_SUPABASE_URL != '' }}
+    steps:
+      - run: |
+          curl -fsS -X POST "${{ vars.VITE_SUPABASE_URL }}/rest/v1/rpc/ping" \
+            -H "apikey: ${{ vars.VITE_SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" -d '{}'

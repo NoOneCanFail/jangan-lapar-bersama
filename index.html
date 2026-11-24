@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Jangan Lapar Bersama</title>
+  <meta name="description" content="Vorkochen zu zweit: eine Person wünscht sich ein Gericht, die andere kocht.">
+  <meta name="theme-color" content="#F3F6F2" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0F1612" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Jangan Lapar">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="referrer" content="no-referrer">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+</head>
+<body>
+  <div class="app" id="app"></div>
+  <div class="bar"><div class="in" id="bar"></div></div>
+  <div class="toast" id="toast" role="status" hidden></div>
+  <div id="sheet"></div>
+  <noscript>Diese App braucht JavaScript.</noscript>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

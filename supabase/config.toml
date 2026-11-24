@@ -1,0 +1,5 @@
+# Nur für die Supabase-CLI (Funktionen hochladen). Das Projekt selbst richtet scripts/setup-supabase.mjs ein.
+project_id = "jangan-lapar-bersama"
+
+[functions.notify]
+verify_jwt = true

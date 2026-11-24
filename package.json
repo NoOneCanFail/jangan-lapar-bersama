@@ -1,0 +1,21 @@
+{
+  "name": "jangan-lapar-bersama",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Vorkochen zu zweit: eine Person wünscht, die andere kocht.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:db": "python3 supabase/tests/run_rls_tests.py"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.7",
+    "vitest": "5.1.0"
+  }
+}
