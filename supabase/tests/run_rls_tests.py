@@ -29,7 +29,7 @@ def psql(sql, user=None):
         pre = "set role anon;"
     elif user:
         pre = f"set role authenticated; set request.jwt.claims = '{json.dumps({'sub': user, 'role': 'authenticated'})}';"
-    r = run([tool("psql"), "-h", sock, "-p", port, "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+    r = run([tool("psql"), "-h", sock, "-p", port, "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
              "-qAt", "-c", pre + sql])
     return r.returncode == 0, (r.stdout.strip() if r.returncode == 0 else r.stderr.strip())
 
