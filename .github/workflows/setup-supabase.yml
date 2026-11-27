@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       project_ref:
-        description: "Supabase Project Reference (die 20 Zeichen aus der Projekt-Adresse)"
+        description: "Supabase Project Reference oder Projekt-Adresse"
         required: true
 
 permissions:
@@ -34,7 +34,10 @@ jobs:
           ENV_FILE: .env.production
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "::error::Secret SUPABASE_ACCESS_TOKEN fehlt."; exit 1; fi
-          REF=$(printf '%s' "$PROJECT_REF" | tr -cd 'a-z0-9')
+          # Akzeptiert die Reference allein oder eine ganze Projekt-Adresse
+          REF=$(printf '%s' "$PROJECT_REF" | tr 'A-Z' 'a-z' | grep -oE '[a-z0-9]{20}' | head -1 || true)
+          if [ -z "$REF" ]; then echo "::error::Keine Project Reference (20 Zeichen) erkannt."; exit 1; fi
+          echo "Project Reference: $REF"
           APP_URL=$(printf '%s' "$APP_URL" | tr 'A-Z' 'a-z')
           node scripts/setup-supabase.mjs "$REF" "$APP_URL"
       - name: Öffentliche Werte speichern und App neu veröffentlichen
