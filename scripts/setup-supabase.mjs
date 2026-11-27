@@ -103,7 +103,7 @@ await attempt("Push-Schlüssel (VAPID)", async () => {
 
 await attempt("Edge Function notify hochladen", async () => {
   try {
-    execFileSync("npx", ["-y", "supabase@3.1.0", "functions", "deploy", "notify", "--project-ref", ref, "--use-api"],
+    execFileSync("npx", ["-y", "supabase@3.1.0", "functions", "deploy", "notify", "--project-ref", ref, "--use-api", "--yes"],
       { cwd: root, stdio: ["ignore", "inherit", "pipe"], env: { ...process.env, SUPABASE_ACCESS_TOKEN: token } });
   } catch (e) {
     throw new Error(String(e.stderr || e.message).replace(token, "***").slice(-400));
