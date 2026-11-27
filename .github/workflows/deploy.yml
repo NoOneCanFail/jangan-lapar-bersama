@@ -29,12 +29,9 @@ jobs:
         run: |
           sudo apt-get install -y -qq postgresql >/dev/null
           python3 supabase/tests/run_rls_tests.py
+      # Öffentliche Supabase-Werte kommen aus .env.production (schreibt der Workflow "Supabase einrichten").
+      # Fehlt die Datei, startet die App im Demo-Modus.
       - run: npm run build
-        env:
-          # Öffentliche Werte (keine Geheimnisse). Fehlen sie, startet die App im Demo-Modus.
-          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
-          VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

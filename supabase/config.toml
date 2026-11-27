@@ -2,4 +2,5 @@
 project_id = "jangan-lapar-bersama"
 
 [functions.notify]
-verify_jwt = true
+# Die Funktion prüft das Login-Token selbst (robust gegenüber den neuen Supabase-Schlüsseln).
+verify_jwt = false

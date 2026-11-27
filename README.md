@@ -23,25 +23,26 @@ Dann `http://localhost:5173/?demo` öffnen. Im Demo-Modus liegen alle Daten nur 
 
 1. Auf [supabase.com](https://supabase.com) kostenlos registrieren.
 2. **New project** → Region **Frankfurt (eu-central-1)** → ein starkes Datenbank-Passwort vergeben (wird danach nicht mehr gebraucht).
-3. Die **Project Reference** notieren (die 20 Zeichen in der Projekt-URL).
-4. Unter **Account → Access Tokens** einen Token erstellen. Diesen Token **nie** in den Code oder in einen Chat kopieren.
+3. Die **Project Reference** notieren (die 20 Zeichen in der Projekt-Adresse, z. B. `supabase.com/dashboard/project/<ref>`).
 
-### 2. Supabase einrichten
+### 2. App-Veröffentlichung einschalten
 
-```bash
-SUPABASE_ACCESS_TOKEN=<token> node scripts/setup-supabase.mjs <project-ref> https://<github-name>.github.io/jangan-lapar-bersama/
-```
+Im Repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
 
-Das Skript spielt Tabellen und Zugriffsregeln ein, stellt Login per E-Mail-Code ein, erzeugt die Push-Schlüssel und lädt die Push-Funktion hoch. Es schreibt drei **öffentliche** Werte nach `.env.local`.
+### 3. Supabase einrichten (läuft auf GitHub, der Token bleibt dort)
 
-### 3. App veröffentlichen (GitHub Pages)
+1. Auf supabase.com: **Account → Access Tokens → Generate new token**.
+2. Im Repository: **Settings → Secrets and variables → Actions → New repository secret**
+   Name `SUPABASE_ACCESS_TOKEN`, Wert = der Token.
+3. **Actions → „Supabase einrichten“ → Run workflow** und die Project Reference eingeben.
 
-1. Im Repository: **Settings → Pages → Source: GitHub Actions**.
-2. **Settings → Secrets and variables → Actions → Variables**: die drei Werte aus `.env.local` als *Variables* anlegen:
-   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_VAPID_PUBLIC_KEY`.
-3. Bei jedem Push auf `main` testet und veröffentlicht GitHub die App automatisch.
+Der Workflow spielt Tabellen und Zugriffsregeln ein, stellt Login per E-Mail-Code ein, erzeugt die Push-Schlüssel, lädt die Push-Funktion hoch, speichert die drei **öffentlichen** Werte in `.env.production` und veröffentlicht die App neu.
 
-> GitHub Pages ist bei kostenlosen Konten nur für **öffentliche** Repositories verfügbar. Das ist hier unbedenklich: Im Code stehen keine Geheimnisse, die Daten schützen die Zugriffsregeln der Datenbank.
+Danach den Token in Supabase wieder löschen (oder das Secret in GitHub), er wird nicht mehr gebraucht.
+
+> Alternativ lokal: `SUPABASE_ACCESS_TOKEN=<token> ENV_FILE=.env.production node scripts/setup-supabase.mjs <project-ref> <app-adresse>`
+
+> GitHub Pages ist bei kostenlosen Konten nur für **öffentliche** Repositories verfügbar. Das ist hier unbedenklich: Im Code stehen keine Geheimnisse, die Daten schützen die Zugriffsregeln der Datenbank. Die Werte in `.env.production` (Projekt-URL, öffentlicher Schlüssel, öffentlicher Push-Schlüssel) sind dafür gemacht, öffentlich zu sein.
 
 ### 4. Auf den Handys
 

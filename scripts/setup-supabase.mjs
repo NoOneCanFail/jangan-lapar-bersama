@@ -75,7 +75,9 @@ const secrets = await call("GET", "/secrets");
 let vapidPublic;
 if (secrets.some(s => s.name === "VAPID_PRIVATE_KEY")) {
   console.log("  Schlüssel gibt es schon. Öffentlichen Schlüssel aus .env.local verwenden.");
-  try { vapidPublic = readFileSync(join(root, ".env.local"), "utf8").match(/VITE_VAPID_PUBLIC_KEY=(.*)/)?.[1]; } catch { /* fehlt */ }
+  for (const f of [".env.production", ".env.local"]) {
+    try { vapidPublic ||= readFileSync(join(root, f), "utf8").match(/VITE_VAPID_PUBLIC_KEY=(.*)/)?.[1]; } catch { /* fehlt */ }
+  }
 } else {
   const keys = JSON.parse(execFileSync("npx", ["-y", "web-push@3.6.7", "generate-vapid-keys", "--json"], { encoding: "utf8" }));
   vapidPublic = keys.publicKey;
@@ -94,9 +96,13 @@ execFileSync("npx", ["-y", "supabase@3.1.0", "functions", "deploy", "notify", "-
 
 step("Öffentliche Werte für die App");
 const keys = await call("GET", "/api-keys");
-const anon = keys.find(k => k.name === "anon")?.api_key;
+// Ältere Projekte: "anon" key. Neuere Projekte: "publishable" key. Beide sind öffentlich.
+const pub = keys.find(k => k.type === "publishable" && k.api_key) || keys.find(k => k.name === "anon");
+const anon = pub?.api_key;
+if (!anon) throw new Error("Kein öffentlicher Schlüssel (anon/publishable) gefunden.");
 const env = `VITE_SUPABASE_URL=https://${ref}.supabase.co\nVITE_SUPABASE_ANON_KEY=${anon}\nVITE_VAPID_PUBLIC_KEY=${vapidPublic ?? ""}\n`;
-writeFileSync(join(root, ".env.local"), env);
-console.log("  .env.local geschrieben. Diese drei Werte sind öffentlich und gehören als GitHub-Variablen ins Repository:");
+const envFile = process.env.ENV_FILE || ".env.local";
+writeFileSync(join(root, envFile), env);
+console.log(`  ${envFile} geschrieben. Diese drei Werte sind öffentlich (keine Geheimnisse):`);
 console.log(env.replace(/^/gm, "    "));
 console.log("Fertig.");

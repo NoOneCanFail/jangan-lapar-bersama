@@ -1,10 +1,10 @@
 // Edge Function "notify": schickt eine Push-Nachricht an die ANDERE Person im eigenen Haushalt.
-// - Nur angemeldete Personen (Supabase prüft das JWT, verify_jwt = true).
+// - Nur angemeldete Personen: die Funktion prüft das Login-Token selbst über Supabase Auth.
 // - Empfänger wird serverseitig ermittelt; man kann niemandem außerhalb des Haushalts schreiben.
 // - Text wird gekürzt und als reiner Text behandelt.
 // Benötigte Secrets: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (z. B. https://deine-app-adresse)
-// Optional: ALLOWED_ORIGIN (Adresse der App, für CORS). SUPABASE_URL, SUPABASE_ANON_KEY und
-// SUPABASE_SERVICE_ROLE_KEY stellt Supabase automatisch bereit.
+// Optional: ALLOWED_ORIGIN (Adresse der App, für CORS). SUPABASE_URL und den Server-Schlüssel
+// stellt Supabase automatisch bereit.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2.119.0";
 
@@ -24,6 +24,13 @@ webpush.setVapidDetails(
   Deno.env.get("VAPID_PRIVATE_KEY")!,
 );
 
+// Server-Schlüssel: klassischer service_role key oder neuer secret key (beides stellt Supabase bereit).
+function serviceKey(): string {
+  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (legacy) return legacy;
+  try { return Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}"))[0] as string; } catch { return ""; }
+}
+
 // Einfache Bremse pro Instanz gegen versehentliche Push-Fluten.
 const recent = new Map<string, number[]>();
 function tooMany(userId: string) {
@@ -38,10 +45,11 @@ Deno.serve(async req => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json(405, { error: "method" });
 
-  const authHeader = req.headers.get("Authorization") ?? "";
-  const url = Deno.env.get("SUPABASE_URL")!;
-  const asUser = createClient(url, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: authHeader } } });
-  const { data: { user } } = await asUser.auth.getUser();
+  // Anmeldung selbst prüfen (funktioniert mit alten und neuen Supabase-Schlüsseln).
+  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!jwt) return json(401, { error: "auth" });
+  const admin = createClient(Deno.env.get("SUPABASE_URL")!, serviceKey(), { auth: { persistSession: false } });
+  const { data: { user } } = await admin.auth.getUser(jwt);
   if (!user) return json(401, { error: "auth" });
   if (tooMany(user.id)) return json(429, { error: "rate" });
 
@@ -51,7 +59,6 @@ Deno.serve(async req => {
   if (!text) return json(400, { error: "text" });
 
   // Ab hier mit Service-Rolle, aber nur für den Haushalt der anfragenden Person.
-  const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const { data: me } = await admin.from("members").select("household_id").eq("user_id", user.id).maybeSingle();
   if (!me) return json(403, { error: "member" });
   const { data: others } = await admin.from("members").select("user_id").eq("household_id", me.household_id).neq("user_id", user.id);
