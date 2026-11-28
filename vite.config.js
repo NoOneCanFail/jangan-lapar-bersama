@@ -22,7 +22,7 @@ export default defineConfig({
   test: { include: ["tests/**/*.test.js"] },
   plugins: [{
     name: "csp",
-    apply: "build",
+    apply: (_cfg, env) => env.command === "build" && env.mode !== "embed",
     transformIndexHtml: html => html.replace("<head>", `<head>\n  <meta http-equiv="Content-Security-Policy" content="${csp}">`),
   }],
 });

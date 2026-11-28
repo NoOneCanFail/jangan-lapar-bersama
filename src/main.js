@@ -9,7 +9,8 @@ import { registerServiceWorker, pushStatus, enablePush, disablePush, isIOS, isSt
 
 // Schutz gegen Clickjacking: GitHub Pages kann den Header "frame-ancestors" nicht setzen,
 // deshalb startet die App nicht, wenn sie in einem fremden Rahmen (iframe) geladen wird.
-if (window.top !== window.self) {
+// (Ausnahme: der Vorschau-Build für den Chat, VITE_EMBED=1, läuft absichtlich in einem Rahmen.)
+if (!import.meta.env.VITE_EMBED && window.top !== window.self) {
   document.body.textContent = "Diese App kann nur direkt geöffnet werden.";
   throw new Error("framed");
 }
@@ -32,7 +33,7 @@ const remember = () => { try { localStorage.setItem("jlb-ui", JSON.stringify({ t
 
 let unsubscribe = () => {};
 async function boot() {
-  registerServiceWorker();
+  if (!import.meta.env.VITE_EMBED) registerServiceWorker();
   const session = await api.session().catch(() => null);
   if (!session) { ui.screen = "email"; return render(); }
   await afterLogin();

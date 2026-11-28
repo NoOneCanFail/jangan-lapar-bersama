@@ -9,7 +9,7 @@ export const config = {
   key: import.meta.env.VITE_SUPABASE_ANON_KEY,
   vapid: import.meta.env.VITE_VAPID_PUBLIC_KEY,
 };
-export const isDemo = !config.url || !config.key || new URLSearchParams(location.search).has("demo");
+export const isDemo = !!import.meta.env.VITE_EMBED || !config.url || !config.key || new URLSearchParams(location.search).has("demo");
 
 /** Fehlermeldungen für Menschen. Eigene Meldungen der Datenbank (auf Deutsch) werden durchgereicht. */
 export function friendly(err) {
