@@ -27,6 +27,8 @@ def psql(sql, user=None):
     pre = ""
     if user == "anon":
         pre = "set role anon;"
+    elif user == "service":
+        pre = "set role service_role;"
     elif user:
         pre = f"set role authenticated; set request.jwt.claims = '{json.dumps({'sub': user, 'role': 'authenticated'})}';"
     r = run([tool("psql"), "-h", sock, "-p", port, "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
@@ -124,6 +126,11 @@ try:
     ok("B sieht A's Push-Abo nicht", "select count(*) from public.push_subscriptions", B, "0")
     denied("Abo für andere Person anlegen", f"insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('{B}', 'https://push.example/x', 'k', 'a')", A, "row-level security")
     denied("Nur https-Endpunkte", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('http://evil', 'k', 'a')", B, "check constraint")
+
+    print("Server (Push-Funktion)")
+    ok("Service-Rolle liest Mitglieder", "select count(*) > 0 from public.members", "service", "t")
+    ok("Service-Rolle liest Push-Abos", "select count(*) from public.push_subscriptions", "service", "1")
+    denied("Service-Rolle kann Wünsche nicht lesen (nicht nötig)", "select * from public.wishes", "service", "permission denied")
 
     print("Grenzen")
     for i in range(11):

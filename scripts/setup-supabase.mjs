@@ -62,11 +62,26 @@ async function attempt(name, fn) {
   }
 }
 
-await attempt("Datenbank-Migration", async () => {
-  const already = await call("POST", "/database/query", { query: "select to_regclass('public.households') is not null as exists" });
-  if (already?.[0]?.exists) return console.log("  Tabellen gibt es schon, Migration wird übersprungen.");
-  for (const f of readdirSync(join(root, "supabase/migrations")).filter(f => f.endsWith(".sql")).sort()) {
+await attempt("Datenbank-Migrationen", async () => {
+  // Buchführung, welche Migrationen schon eingespielt sind (eigenes Schema, nicht über die API erreichbar).
+  await call("POST", "/database/query", {
+    query: "create schema if not exists private; create table if not exists private.applied_migrations (name text primary key, applied_at timestamptz not null default now()); revoke all on schema private from public;",
+  });
+  const files = readdirSync(join(root, "supabase/migrations")).filter(f => f.endsWith(".sql")).sort();
+  let done = new Set((await call("POST", "/database/query", { query: "select name from private.applied_migrations" })).map(r => r.name));
+  // Projekte, die vor dieser Buchführung eingerichtet wurden: erste Migration gilt als eingespielt.
+  if (!done.size) {
+    const exists = await call("POST", "/database/query", { query: "select to_regclass('public.households') is not null as exists" });
+    if (exists?.[0]?.exists) {
+      await call("POST", "/database/query", { query: `insert into private.applied_migrations (name) values ('${files[0]}') on conflict do nothing` });
+      done = new Set([files[0]]);
+    }
+  }
+  for (const f of files) {
+    if (done.has(f)) { console.log("  schon da:", f); continue; }
+    if (!/^[0-9]{14}_[a-z0-9_]+\.sql$/.test(f)) throw new Error("Ungültiger Dateiname: " + f);
     await call("POST", "/database/query", { query: readFileSync(join(root, "supabase/migrations", f), "utf8") });
+    await call("POST", "/database/query", { query: `insert into private.applied_migrations (name) values ('${f}')` });
     console.log("  eingespielt:", f);
   }
 });

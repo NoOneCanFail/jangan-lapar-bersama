@@ -12,6 +12,6 @@ grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema public to anon, authenticated, service_role;
 -- Supabase vergibt standardmäßig alle Rechte an anon/authenticated. Das simulieren wir,
 -- damit der Test zeigt, dass die Migration diese Rechte wieder entzieht.
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
 create publication supabase_realtime;
