@@ -25,10 +25,14 @@ webpush.setVapidDetails(
 );
 
 // Server-Schlüssel: klassischer service_role key oder neuer secret key (beides stellt Supabase bereit).
+// Neue Projekte: SUPABASE_SECRET_KEYS (JSON, z. B. {"default":"sb_secret_..."}); der alte JWT-Schlüssel
+// kann dort deaktiviert sein. Deshalb zuerst den neuen nehmen.
 function serviceKey(): string {
-  const legacy = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (legacy) return legacy;
-  try { return Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}"))[0] as string; } catch { return ""; }
+  try {
+    const k = Object.values(JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}"))[0];
+    if (typeof k === "string" && k) return k;
+  } catch { /* kein JSON */ }
+  return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
 
 // Einfache Bremse pro Instanz gegen versehentliche Push-Fluten.
@@ -59,7 +63,8 @@ Deno.serve(async req => {
   if (!text) return json(400, { error: "text" });
 
   // Ab hier mit Service-Rolle, aber nur für den Haushalt der anfragenden Person.
-  const { data: me } = await admin.from("members").select("household_id").eq("user_id", user.id).maybeSingle();
+  const { data: me, error: dbErr } = await admin.from("members").select("household_id").eq("user_id", user.id).maybeSingle();
+  if (dbErr) { console.error("members:", dbErr.message); return json(500, { error: "db", hint: dbErr.message.slice(0, 120) }); }
   if (!me) return json(403, { error: "member" });
   const { data: others } = await admin.from("members").select("user_id").eq("household_id", me.household_id).neq("user_id", user.id);
   const ids = (others ?? []).map(o => o.user_id);

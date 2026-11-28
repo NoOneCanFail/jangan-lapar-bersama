@@ -407,12 +407,13 @@ function bind() {
     ui.busy = true; ui.error = ""; render();
     try {
       if (ui.authMode === "signup") await api.signUp(email, password); else await api.signIn(email, password);
+      ui.authMode = "login";
       ui.busy = false; await afterLogin();
     } catch (err) { ui.busy = false; ui.error = friendly(err); render(); }
   }, "submit");
   on("#mode-signup", () => { ui.authMode = "signup"; ui.error = ""; render(); });
   on("#mode-login", () => { ui.authMode = "login"; ui.error = ""; render(); });
-  on("#logout", async () => { unsubscribe(); await api.signOut(); ui.member = null; ui.data = null; ui.screen = "email"; render(); });
+  on("#logout", async () => { unsubscribe(); await api.signOut(); ui.member = null; ui.data = null; ui.authMode = "login"; ui.error = ""; ui.screen = "email"; render(); });
 
   // Koppeln
   on("[data-create]", async e => {
