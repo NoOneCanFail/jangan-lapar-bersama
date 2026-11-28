@@ -62,22 +62,42 @@ await attempt("Datenbank-Migration", async () => {
   }
 });
 
-await attempt("Login per E-Mail-Code", async () => {
-  const mail = `<h2>Dein Code für Jangan Lapar Bersama</h2>
-<p>Gib diesen Code in der App ein:</p>
-<p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
-<p>Der Code gilt eine Stunde. Wenn du das nicht warst, ignoriere diese E-Mail.</p>`;
+await attempt("Login: App-Adresse", async () => {
   await call("PATCH", "/config/auth", {
     site_url: appUrl,
     uri_allow_list: appUrl,
     mailer_otp_exp: 3600,
-    mailer_subjects_magic_link: "Dein Anmeldecode",
-    mailer_templates_magic_link_content: mail,
-    mailer_subjects_confirmation: "Dein Anmeldecode",
-    mailer_templates_confirmation_content: mail,
     external_anonymous_users_enabled: false,
   });
-  console.log("  E-Mail-Vorlage mit Code gesetzt, App-Adresse:", appUrl);
+  console.log("  App-Adresse gesetzt:", appUrl);
+});
+
+await attempt("Login: E-Mail mit Code", async () => {
+  const mail = `<h2>Dein Code für Jangan Lapar Bersama</h2>
+<p>Gib diesen Code in der App ein:</p>
+<p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
+<p>Der Code gilt eine Stunde. Wenn du das nicht warst, ignoriere diese E-Mail.</p>`;
+  try {
+    await call("PATCH", "/config/auth", {
+      mailer_subjects_magic_link: "Dein Anmeldecode",
+      mailer_templates_magic_link_content: mail,
+      mailer_subjects_confirmation: "Dein Anmeldecode",
+      mailer_templates_confirmation_content: mail,
+    });
+    console.log("  Eigene E-Mail-Vorlage mit Code gesetzt.");
+  } catch (e) {
+    // Kostenloser Tarif ohne eigenen Mailserver: Vorlagen nicht änderbar. Prüfen, ob die Standardvorlage einen Code enthält.
+    const cfg = await call("GET", "/config/auth");
+    const report = {};
+    for (const k of ["mailer_templates_magic_link_content", "mailer_templates_confirmation_content"]) {
+      const t = cfg[k] ?? "";
+      report[k] = { hatCode: /\.Token\b/.test(t), hatLink: /ConfirmationURL|TokenHash/.test(t), leer: !t };
+    }
+    console.log("  Vorlagen nicht änderbar:", String(e.message).slice(0, 120));
+    console.log("  Standardvorlagen:", JSON.stringify(report));
+    console.log("  Mailer:", JSON.stringify({ smtp: !!cfg.smtp_host, otp_length: cfg.mailer_otp_length, autoconfirm: cfg.mailer_autoconfirm, signup: !cfg.disable_signup }));
+    if (!Object.values(report).every(r => r.hatCode)) throw new Error("Standard-E-Mail enthält keinen Code.");
+  }
 });
 
 // Öffentlicher Push-Schlüssel aus einem früheren Lauf (falls vorhanden)
