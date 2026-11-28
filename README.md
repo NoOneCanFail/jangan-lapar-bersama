@@ -68,7 +68,10 @@ Wenn beide gekoppelt sind: **Actions → „Supabase einrichten“ → Run workf
 | Koppeln | Höchstens zwei Personen pro Haushalt. Codes: 8 Zeichen, 24 h gültig, einmalig. Nach 10 Fehlversuchen pro Stunde gesperrt. |
 | Login | E-Mail und Passwort (mind. 8 Zeichen). Ohne Bestätigungs-E-Mail, weil der kostenlose Supabase-Mailversand nur an Team-Mitglieder zustellt. Nach dem Koppeln wird die Registrierung geschlossen. Keine anonymen Konten. |
 | Geheimnisse | Nur in Supabase-Secrets (VAPID private key, service role). Im Code und in GitHub nur öffentliche Werte. |
-| Push | Empfänger wird auf dem Server bestimmt. Man kann nur der anderen Person im eigenen Haushalt schreiben. |
+| Push | Empfänger wird auf dem Server bestimmt. Man kann nur der anderen Person im eigenen Haushalt schreiben. Push-Ziele nur bei bekannten Push-Diensten (Google, Apple, Mozilla, Microsoft), damit der Server keine beliebigen Adressen aufruft (SSRF). Beim Abmelden wird das Push-Abo des Geräts gelöscht. |
+| Browser | Content Security Policy: nur eigene Skripte, Verbindungen nur zu Supabase. Kein Laden in fremden Rahmen (Clickjacking), per Skript, weil GitHub Pages keine eigenen Header erlaubt. |
+| Login-Sitzung | Liegt wie bei Supabase-Web-Apps üblich im Browser-Speicher. Schutz davor sind die strenge CSP, durchgehendes Escaping und nur eine Fremdbibliothek. |
+| GitHub-Workflows | Actions auf feste Commit-Hashes gepinnt, Dependabot mit 14 Tagen Wartezeit, Setup-Job ohne fremde npm-Pakete außer der Supabase-CLI. Der Supabase-Token wird nur für die Einrichtung gebraucht und danach gelöscht. |
 | Eingaben | Gerichte-IDs, Texte und Mengen werden in der Datenbank begrenzt. Alles wird beim Anzeigen escaped. |
 | Gespeicherte Daten | E-Mail-Adresse, Wünsche, Wochenstatus, Gefrierfach, Push-Abo. Keine Namen, keine Adressen. |
 | Abhängigkeiten | Nur `@supabase/supabase-js` in der App. Versionen fest gepinnt, `npm audit` ohne Befund. |

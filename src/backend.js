@@ -98,6 +98,9 @@ export function supabaseBackend() {
       await sb.from("push_subscriptions").delete().eq("endpoint", endpoint);
       must(await sb.from("push_subscriptions").insert({ endpoint, p256dh, auth }));
     },
+    async removePush(endpoint) {
+      await sb.from("push_subscriptions").delete().eq("endpoint", endpoint);
+    },
     async hasPush(endpoint) {
       const r = must(await sb.from("push_subscriptions").select("id").eq("endpoint", endpoint));
       return r.length > 0;

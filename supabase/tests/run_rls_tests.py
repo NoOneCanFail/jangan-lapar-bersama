@@ -69,6 +69,7 @@ try:
     denied("anon kann Wünsche nicht lesen", "select * from public.wishes", "anon", "permission denied")
     denied("anon kann keinen Haushalt anlegen", "select public.create_household('esser')", "anon", "permission denied")
     ok("anon darf ping (Keepalive)", "select public.ping()", "anon", "1")
+    ok("ping hat feste search_path", "select array_to_string(proconfig, ',') from pg_proc where proname = 'ping'", None, 'search_path=""')
 
     print("Koppeln")
     code = ok("A legt Haushalt an (isst)", "select public.create_household('esser')", A)
@@ -122,14 +123,18 @@ try:
     ok("C sieht A's Gefrierfach nicht", "select count(*) from public.freezer_items", C, "0")
 
     print("Push-Abos")
-    ok("A speichert Push-Abo", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://push.example/abc', 'k', 'a')", A)
+    ok("A speichert Push-Abo", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://fcm.googleapis.com/fcm/send/abc', 'k', 'a')", A)
     ok("B sieht A's Push-Abo nicht", "select count(*) from public.push_subscriptions", B, "0")
-    denied("Abo für andere Person anlegen", f"insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('{B}', 'https://push.example/x', 'k', 'a')", A, "row-level security")
+    denied("Abo für andere Person anlegen", f"insert into public.push_subscriptions (user_id, endpoint, p256dh, auth) values ('{B}', 'https://web.push.apple.com/x', 'k', 'a')", A, "row-level security")
     denied("Nur https-Endpunkte", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('http://evil', 'k', 'a')", B, "check constraint")
+    denied("Keine beliebigen Server als Push-Ziel (SSRF)", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://evil.example/hook', 'k', 'a')", B, "check constraint")
+    denied("Kein Trick mit ähnlichem Namen", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://fcm.googleapis.com.evil.example/x', 'k', 'a')", B, "check constraint")
+    ok("Apple-Push erlaubt", "insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://web.push.apple.com/QOabc', 'k', 'a')", B)
+    ok("Windows-Push erlaubt", "with i as (insert into public.push_subscriptions (endpoint, p256dh, auth) values ('https://wns2-par02p.notify.windows.com/w/?token=x', 'k', 'a') returning 1) select count(*) from i", B, "1")
 
     print("Server (Push-Funktion)")
     ok("Service-Rolle liest Mitglieder", "select count(*) > 0 from public.members", "service", "t")
-    ok("Service-Rolle liest Push-Abos", "select count(*) from public.push_subscriptions", "service", "1")
+    ok("Service-Rolle liest Push-Abos", "select count(*) from public.push_subscriptions", "service", "3")
     denied("Service-Rolle kann Wünsche nicht lesen (nicht nötig)", "select * from public.wishes", "service", "permission denied")
 
     print("Grenzen")

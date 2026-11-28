@@ -5,7 +5,14 @@ import {
   freezerCount, freeSlots, validEmail, cleanPairCode, prettyPairCode, PORTIONS, FREEZER_CAP, HEAT,
 } from "./logic.js";
 import { isDemo, supabaseBackend, demoBackend, friendly } from "./backend.js";
-import { registerServiceWorker, pushStatus, enablePush, isIOS, isStandalone } from "./push.js";
+import { registerServiceWorker, pushStatus, enablePush, disablePush, isIOS, isStandalone } from "./push.js";
+
+// Schutz gegen Clickjacking: GitHub Pages kann den Header "frame-ancestors" nicht setzen,
+// deshalb startet die App nicht, wenn sie in einem fremden Rahmen (iframe) geladen wird.
+if (window.top !== window.self) {
+  document.body.textContent = "Diese App kann nur direkt geöffnet werden.";
+  throw new Error("framed");
+}
 
 const api = isDemo ? demoBackend() : supabaseBackend();
 const $app = document.getElementById("app");
@@ -413,7 +420,7 @@ function bind() {
   }, "submit");
   on("#mode-signup", () => { ui.authMode = "signup"; ui.error = ""; render(); });
   on("#mode-login", () => { ui.authMode = "login"; ui.error = ""; render(); });
-  on("#logout", async () => { unsubscribe(); await api.signOut(); ui.member = null; ui.data = null; ui.authMode = "login"; ui.error = ""; ui.screen = "email"; render(); });
+  on("#logout", async () => { unsubscribe(); await disablePush(api); await api.signOut(); ui.member = null; ui.data = null; ui.authMode = "login"; ui.error = ""; ui.screen = "email"; render(); });
 
   // Koppeln
   on("[data-create]", async e => {

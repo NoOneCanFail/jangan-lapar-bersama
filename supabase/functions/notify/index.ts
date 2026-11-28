@@ -35,6 +35,15 @@ function serviceKey(): string {
   return Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 }
 
+// Nur an bekannte Push-Dienste senden (zweite Sicherung neben der Datenbank-Regel, gegen SSRF).
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^web\.push\.apple\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/];
+function knownPushService(endpoint: string) {
+  try {
+    const u = new URL(endpoint);
+    return u.protocol === "https:" && (u.port === "" || u.port === "443") && PUSH_HOSTS.some(r => r.test(u.hostname));
+  } catch { return false; }
+}
+
 // Einfache Bremse pro Instanz gegen versehentliche Push-Fluten.
 const recent = new Map<string, number[]>();
 function tooMany(userId: string) {
@@ -64,7 +73,7 @@ Deno.serve(async req => {
 
   // Ab hier mit Service-Rolle, aber nur für den Haushalt der anfragenden Person.
   const { data: me, error: dbErr } = await admin.from("members").select("household_id").eq("user_id", user.id).maybeSingle();
-  if (dbErr) { console.error("members:", dbErr.message); return json(500, { error: "db", hint: dbErr.message.slice(0, 120) }); }
+  if (dbErr) { console.error("members:", dbErr.message); return json(500, { error: "db" }); }
   if (!me) return json(403, { error: "member" });
   const { data: others } = await admin.from("members").select("user_id").eq("household_id", me.household_id).neq("user_id", user.id);
   const ids = (others ?? []).map(o => o.user_id);
@@ -73,7 +82,7 @@ Deno.serve(async req => {
   const { data: subs } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").in("user_id", ids);
   const payload = JSON.stringify({ title: "Jangan Lapar Bersama", body: text });
   let sent = 0;
-  await Promise.all((subs ?? []).map(async s => {
+  await Promise.all((subs ?? []).filter(s => knownPushService(s.endpoint)).map(async s => {
     try {
       await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 60 * 60 * 24 });
       sent++;

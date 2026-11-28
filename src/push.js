@@ -38,3 +38,14 @@ export async function enablePush(backend) {
   const j = sub.toJSON();
   await backend.savePush({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth });
 }
+
+/** Beim Abmelden: Push für dieses Gerät beenden, damit ein geteiltes Gerät keine Nachrichten mehr bekommt. */
+export async function disablePush(backend) {
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return;
+    await backend.removePush?.(sub.endpoint);
+    await sub.unsubscribe();
+  } catch { /* Abmelden soll nie daran scheitern */ }
+}

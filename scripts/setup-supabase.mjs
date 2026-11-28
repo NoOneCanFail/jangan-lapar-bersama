@@ -13,6 +13,7 @@
 //  5. Öffentliche Werte für die App in .env.local schreiben (URL, anon key, VAPID public key)
 import { readFileSync, writeFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { generateKeyPairSync } from "node:crypto";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -39,6 +40,14 @@ async function call(method, path, body) {
 }
 
 const step = m => console.log("\n• " + m);
+
+/** VAPID-Schlüsselpaar (P-256) direkt mit Node erzeugen, ohne fremdes npm-Paket im Job mit dem Token. */
+function vapidKeys() {
+  const { publicKey, privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const pub = publicKey.export({ format: "jwk" }), priv = privateKey.export({ format: "jwk" });
+  const raw = Buffer.concat([Buffer.from([4]), Buffer.from(pub.x, "base64url"), Buffer.from(pub.y, "base64url")]);
+  return { publicKey: raw.toString("base64url"), privateKey: priv.d };
+}
 
 // Nur Registrierung schließen oder wieder öffnen, sonst nichts.
 if (process.env.SIGNUPS === "schliessen" || process.env.SIGNUPS === "oeffnen") {
@@ -109,7 +118,7 @@ await attempt("Push-Schlüssel (VAPID)", async () => {
   const secrets = await call("GET", "/secrets");
   if (vapidPublic && secrets.some(s => s.name === "VAPID_PRIVATE_KEY")) return console.log("  Schlüssel gibt es schon.");
   // Neu erzeugen (auch wenn nur der öffentliche Teil verloren ging). POST überschreibt vorhandene Secrets.
-  const keys = JSON.parse(execFileSync("npx", ["-y", "web-push@3.6.7", "generate-vapid-keys", "--json"], { encoding: "utf8" }));
+  const keys = vapidKeys();
   await call("POST", "/secrets", [
     { name: "VAPID_PUBLIC_KEY", value: keys.publicKey },
     { name: "VAPID_PRIVATE_KEY", value: keys.privateKey },
@@ -123,7 +132,8 @@ await attempt("Push-Schlüssel (VAPID)", async () => {
 await attempt("Edge Function notify hochladen", async () => {
   try {
     execFileSync("npx", ["-y", "supabase@3.1.0", "functions", "deploy", "notify", "--project-ref", ref, "--use-api", "--yes"],
-      { cwd: root, stdio: ["ignore", "inherit", "pipe"], env: { ...process.env, SUPABASE_ACCESS_TOKEN: token } });
+      // Nur die nötigsten Umgebungsvariablen weitergeben.
+      { cwd: root, stdio: ["ignore", "inherit", "pipe"], env: { PATH: process.env.PATH, HOME: process.env.HOME, SUPABASE_ACCESS_TOKEN: token } });
   } catch (e) {
     throw new Error(String(e.stderr || e.message).replace(token, "***").slice(-400));
   }
@@ -142,6 +152,19 @@ await attempt("Öffentliche Werte für die App", async () => {
   console.log(`  ${envFile} geschrieben. Diese drei Werte sind öffentlich (keine Geheimnisse):`);
   console.log(env.replace(/^/gm, "    "));
 });
+
+// Supabase Security Advisor: nur zur Info, braucht die Berechtigung "Advisors: Read".
+await (async () => {
+  step("Security Advisor (Info)");
+  try {
+    const r = await call("GET", "/advisors/security");
+    const lints = (r?.lints ?? []).filter(l => l.level !== "INFO");
+    if (!lints.length) return console.log("  Keine Warnungen.");
+    for (const l of lints) console.log(`  ${l.level}: ${l.title} – ${String(l.detail ?? "").slice(0, 160)}`);
+  } catch (e) {
+    console.log("  Übersprungen (Token ohne Berechtigung \"Advisors: Read\"). Im Dashboard unter Advisors → Security Advisor ansehen.");
+  }
+})();
 
 if (problems.length) {
   console.log("\nNicht alles hat geklappt:");
