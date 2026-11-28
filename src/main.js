@@ -1,4 +1,8 @@
 import "./style.css";
+import ICON_SVG from "../public/icons/icon.svg?raw";
+
+// Erinnerung, wenn noch kein Gericht gewählt ist (Wunsch der Nutzerin/des Nutzers: genau dieser Text).
+const REMINDER = "Give food";
 import { AISLES, CUISINES, TYPES, SIDES, DISHES, BY, ING, PICKS, SOUPS, mainIng } from "./data.js";
 import {
   esc, ranked, shoppingGroups, fmt, packHint, expiryDate, shortDate, weekLabel, wishDish,
@@ -214,7 +218,7 @@ function appScreen() {
         <div class="demo-note">Demo-Modus: beide Rollen auf einem Gerät, nichts wird gesendet.</div>`
       : `<div class="rolechip">${r === "koch" ? "Du kochst" : "Du wünschst dir das Essen"}</div>`}
   </header>
-  ${inbox.map((m, i) => `<div class="push" role="status"><span class="ico">JLB</span><span class="t"><small>${esc(m.at)}</small>${esc(m.t)}</span><button data-read="${i}">OK</button></div>`).join("")}
+  ${inbox.map((m, i) => `<div class="push" role="status"><span class="ico" aria-hidden="true">${ICON_SVG}</span><span class="t"><small>${esc(m.at)}</small>${esc(m.t)}</span><button data-read="${i}">OK</button></div>`).join("")}
   ${r === "koch" ? cook() : eater()}
   ${api.demo ? `<div class="footer"><span>Beispieldaten</span><span><button class="link" id="reset-ex">Beispiel laden</button> · <button class="link" id="reset-empty">Alles leeren</button></span></div>` : ""}`;
 }
@@ -320,7 +324,7 @@ function sheetHTML(d) {
 /* ---------- Kochende Person ---------- */
 function cook() {
   const q = queue(), w = q[0];
-  if (!w) return `<div class="empty" style="margin-top:6px"><b>Noch kein Wunsch für diese Woche</b>Im Gefrierfach sind ${freezerCount(freezer())} Boxen.<button class="ghost" id="nudge">Erinnerung senden</button></div>`;
+  if (!w) return `<div class="empty" style="margin-top:6px"><b>Noch kein Wunsch für diese Woche</b>Im Gefrierfach sind ${freezerCount(freezer())} Boxen.<button class="ghost" id="nudge">„Give food“ senden senden</button></div>`;
   const d = wishDish(w);
   const steps = ["gewuenscht", "eingekauft", "gekocht"], L = { gewuenscht: "Gewünscht", eingekauft: "Eingekauft", gekocht: "Gekocht" };
   const si = steps.indexOf(week().status);
@@ -514,11 +518,11 @@ function bind() {
   on("#handover", () => {
     const d = wishDish(queue()[0]), last = queue().length <= 1;
     act(() => api.handover(), {
-      ok: "Übergeben. Gefrierfach aktualisiert.",
-      notify: `${PORTIONS} Boxen ${d.name} sind da. Ab ins Gefrierfach!${last ? " Was möchtest du nächste Woche?" : ""}`,
+      ok: () => { if (last) setTimeout(() => api.notify(REMINDER), 1500); return "Übergeben. Gefrierfach aktualisiert."; },
+      notify: `${PORTIONS} Boxen ${d.name} sind da. Ab ins Gefrierfach!`,
     });
   });
-  on("#nudge", () => act(async () => {}, { ok: "Erinnerung gesendet", notify: "Was möchtest du diese Woche essen?" }));
+  on("#nudge", () => act(async () => {}, { ok: "„Give food“ gesendet", notify: REMINDER }));
 }
 
 document.addEventListener("keydown", e => { if (e.key === "Escape" && ui.sheet) { ui.sheet = null; render(); } });

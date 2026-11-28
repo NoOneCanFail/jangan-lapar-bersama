@@ -1,6 +1,6 @@
 // Service Worker: App offline verfügbar machen und Push-Nachrichten anzeigen.
 // Gecacht werden nur eigene Dateien (gleiche Adresse), nie Daten von Supabase.
-const CACHE = "jlb-v1";
+const CACHE = "jlb-v2";
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(["./", "./index.html", "./manifest.webmanifest"])).then(() => self.skipWaiting()));
