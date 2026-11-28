@@ -36,7 +36,7 @@ Im Repository: **Settings → Pages → Build and deployment → Source: GitHub 
    Name `SUPABASE_ACCESS_TOKEN`, Wert = der Token.
 3. **Actions → „Supabase einrichten“ → Run workflow** und die Project Reference eingeben.
 
-Der Workflow spielt Tabellen und Zugriffsregeln ein, stellt Login per E-Mail-Code ein, erzeugt die Push-Schlüssel, lädt die Push-Funktion hoch, speichert die drei **öffentlichen** Werte in `.env.production` und veröffentlicht die App neu.
+Der Workflow spielt Tabellen und Zugriffsregeln ein, stellt Login per E-Mail und Passwort ein, erzeugt die Push-Schlüssel, lädt die Push-Funktion hoch, speichert die drei **öffentlichen** Werte in `.env.production` und veröffentlicht die App neu.
 
 Danach den Token in Supabase wieder löschen (oder das Secret in GitHub), er wird nicht mehr gebraucht.
 
@@ -46,7 +46,7 @@ Danach den Token in Supabase wieder löschen (oder das Secret in GitHub), er wir
 
 ### 4. Auf den Handys
 
-1. App-Adresse öffnen und anmelden (Code kommt per E-Mail).
+1. App-Adresse öffnen, **Konto anlegen** (E-Mail + Passwort mit mindestens 8 Zeichen). Es wird keine E-Mail verschickt.
 2. Person 1 wählt ihre Rolle und bekommt einen **Kopplungscode**. Person 2 tippt „Ich habe schon einen Code“.
 3. **Zum Home-Bildschirm hinzufügen**
    - iPhone (Safari): Teilen → „Zum Home-Bildschirm“. Danach die App **vom Home-Bildschirm** öffnen.
@@ -55,7 +55,9 @@ Danach den Token in Supabase wieder löschen (oder das Secret in GitHub), er wir
 
 ### 5. Danach absichern
 
-Wenn beide gekoppelt sind: in Supabase **Authentication → Sign In / Providers → „Allow new users to sign up“ ausschalten**. Dann kann sich niemand Fremdes mehr registrieren.
+Wenn beide gekoppelt sind: **Actions → „Supabase einrichten“ → Run workflow → Aktion „registrierung-schliessen“**. Dann kann niemand mehr ein Konto anlegen. (Alternativ in Supabase: Authentication → Sign In / Providers → „Allow new users to sign up“ ausschalten.)
+
+**Passwort vergessen?** Die eingerichtete Person kann in Supabase unter Authentication → Users das Konto löschen. Dann Registrierung kurz öffnen, neu registrieren, mit neuem Kopplungscode verbinden und wieder schließen.
 
 ## Sicherheit
 
@@ -64,7 +66,7 @@ Wenn beide gekoppelt sind: in Supabase **Authentication → Sign In / Providers 
 | Wer sieht was? | Row Level Security auf allen Tabellen. Jede Person sieht nur den eigenen Haushalt. 50 automatische Tests prüfen das (`npm run test:db`). |
 | Nicht angemeldet | Hat keinerlei Zugriff (außer einer leeren `ping`-Funktion fürs Wachhalten). |
 | Koppeln | Höchstens zwei Personen pro Haushalt. Codes: 8 Zeichen, 24 h gültig, einmalig. Nach 10 Fehlversuchen pro Stunde gesperrt. |
-| Login | E-Mail-Code, kein Passwort. Keine anonymen Konten. |
+| Login | E-Mail und Passwort (mind. 8 Zeichen). Ohne Bestätigungs-E-Mail, weil der kostenlose Supabase-Mailversand nur an Team-Mitglieder zustellt. Nach dem Koppeln wird die Registrierung geschlossen. Keine anonymen Konten. |
 | Geheimnisse | Nur in Supabase-Secrets (VAPID private key, service role). Im Code und in GitHub nur öffentliche Werte. |
 | Push | Empfänger wird auf dem Server bestimmt. Man kann nur der anderen Person im eigenen Haushalt schreiben. |
 | Eingaben | Gerichte-IDs, Texte und Mengen werden in der Datenbank begrenzt. Alles wird beim Anzeigen escaped. |

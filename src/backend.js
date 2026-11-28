@@ -16,7 +16,10 @@ export function friendly(err) {
   const m = err?.message || String(err || "");
   if (/fetch|network|Failed to/i.test(m)) return "Keine Verbindung. Bitte Internet prüfen und noch mal versuchen.";
   if (/rate limit|too many/i.test(m)) return "Zu viele Versuche. Bitte ein paar Minuten warten.";
-  if (/otp|token.*(expired|invalid)/i.test(m)) return "Der Code stimmt nicht oder ist abgelaufen. Fordere einen neuen an.";
+  if (/invalid login credentials/i.test(m)) return "E-Mail oder Passwort stimmt nicht.";
+  if (/already registered|already exists/i.test(m)) return "Für diese E-Mail gibt es schon ein Konto. Melde dich an.";
+  if (/signups? not allowed|signup.*disabled/i.test(m)) return "Neue Konten sind geschlossen. Melde dich mit deinem bestehenden Konto an.";
+  if (/password/i.test(m) && /(least|short|weak|characters)/i.test(m)) return "Das Passwort muss mindestens 8 Zeichen haben.";
   if (/[äöüÄÖÜß]|^(Du |Code|Nicht|Kein|Erst|Höchstens|Für |Zu viele|Ihr )/.test(m)) return m;
   return "Das hat nicht geklappt. Bitte noch mal versuchen.";
 }
@@ -35,11 +38,14 @@ export function supabaseBackend() {
     demo: false,
     async session() { return must(await sb.auth.getSession()).session; },
     onAuth(cb) { return sb.auth.onAuthStateChange((_e, s) => cb(s)).data.subscription; },
-    async sendCode(email) {
-      must(await sb.auth.signInWithOtp({ email: email.trim().toLowerCase(), options: { shouldCreateUser: true } }));
+    // Login mit E-Mail und Passwort. Es werden keine E-Mails verschickt (Bestätigung ist abgeschaltet),
+    // weil der kostenlose Supabase-Mailversand nur an Team-Mitglieder zustellt.
+    async signIn(email, password) {
+      must(await sb.auth.signInWithPassword({ email: email.trim().toLowerCase(), password }));
     },
-    async verifyCode(email, token) {
-      must(await sb.auth.verifyOtp({ email: email.trim().toLowerCase(), token, type: "email" }));
+    async signUp(email, password) {
+      const data = must(await sb.auth.signUp({ email: email.trim().toLowerCase(), password }));
+      if (!data.session) throw new Error("Konto angelegt, aber noch nicht freigeschaltet. Bitte die Person fragen, die die App eingerichtet hat.");
     },
     async signOut() { me = null; await sb.auth.signOut(); },
 

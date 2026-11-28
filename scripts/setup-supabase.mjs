@@ -7,7 +7,7 @@
 //
 // Was passiert:
 //  1. Datenbank-Migration einspielen (Tabellen, Zugriffsregeln, Funktionen)
-//  2. Login per E-Mail-Code einstellen (deutsche E-Mail mit Code statt Link)
+//  2. Login per E-Mail + Passwort einstellen (ohne Bestätigungs-E-Mail)
 //  3. Push-Schlüssel (VAPID) erzeugen und als Secrets speichern – der private Schlüssel wird nie ausgegeben
 //  4. Edge Function "notify" hochladen
 //  5. Öffentliche Werte für die App in .env.local schreiben (URL, anon key, VAPID public key)
@@ -39,6 +39,15 @@ async function call(method, path, body) {
 }
 
 const step = m => console.log("\n• " + m);
+
+// Nur Registrierung schließen oder wieder öffnen, sonst nichts.
+if (process.env.SIGNUPS === "schliessen" || process.env.SIGNUPS === "oeffnen") {
+  const close = process.env.SIGNUPS === "schliessen";
+  step(close ? "Registrierung schließen" : "Registrierung öffnen");
+  await call("PATCH", "/config/auth", { disable_signup: close });
+  console.log(close ? "  Neue Konten sind jetzt nicht mehr möglich." : "  Neue Konten sind wieder möglich.");
+  process.exit(0);
+}
 const problems = [];
 // Jeder Schritt läuft für sich. Fehlt eine Berechtigung, geht es trotzdem weiter,
 // und am Ende steht eine vollständige Liste, was fehlt.
@@ -62,42 +71,17 @@ await attempt("Datenbank-Migration", async () => {
   }
 });
 
-await attempt("Login: App-Adresse", async () => {
+await attempt("Login einstellen", async () => {
+  // E-Mail + Passwort ohne Bestätigungs-E-Mail: Der kostenlose Supabase-Mailversand stellt nur an
+  // Team-Mitglieder zu. Schutz kommt stattdessen über Kopplungscode + später geschlossene Registrierung.
   await call("PATCH", "/config/auth", {
     site_url: appUrl,
     uri_allow_list: appUrl,
-    mailer_otp_exp: 3600,
+    mailer_autoconfirm: true,
+    password_min_length: 8,
     external_anonymous_users_enabled: false,
   });
-  console.log("  App-Adresse gesetzt:", appUrl);
-});
-
-await attempt("Login: E-Mail mit Code", async () => {
-  const mail = `<h2>Dein Code für Jangan Lapar Bersama</h2>
-<p>Gib diesen Code in der App ein:</p>
-<p style="font-size:28px;font-weight:bold;letter-spacing:6px">{{ .Token }}</p>
-<p>Der Code gilt eine Stunde. Wenn du das nicht warst, ignoriere diese E-Mail.</p>`;
-  try {
-    await call("PATCH", "/config/auth", {
-      mailer_subjects_magic_link: "Dein Anmeldecode",
-      mailer_templates_magic_link_content: mail,
-      mailer_subjects_confirmation: "Dein Anmeldecode",
-      mailer_templates_confirmation_content: mail,
-    });
-    console.log("  Eigene E-Mail-Vorlage mit Code gesetzt.");
-  } catch (e) {
-    // Kostenloser Tarif ohne eigenen Mailserver: Vorlagen nicht änderbar. Prüfen, ob die Standardvorlage einen Code enthält.
-    const cfg = await call("GET", "/config/auth");
-    const report = {};
-    for (const k of ["mailer_templates_magic_link_content", "mailer_templates_confirmation_content"]) {
-      const t = cfg[k] ?? "";
-      report[k] = { hatCode: /\.Token\b/.test(t), hatLink: /ConfirmationURL|TokenHash/.test(t), leer: !t };
-    }
-    console.log("  Vorlagen nicht änderbar:", String(e.message).slice(0, 120));
-    console.log("  Standardvorlagen:", JSON.stringify(report));
-    console.log("  Mailer:", JSON.stringify({ smtp: !!cfg.smtp_host, otp_length: cfg.mailer_otp_length, autoconfirm: cfg.mailer_autoconfirm, signup: !cfg.disable_signup }));
-    if (!Object.values(report).every(r => r.hatCode)) throw new Error("Standard-E-Mail enthält keinen Code.");
-  }
+  console.log("  E-Mail + Passwort aktiv (ohne Bestätigungs-E-Mail), App-Adresse:", appUrl);
 });
 
 // Öffentlicher Push-Schlüssel aus einem früheren Lauf (falls vorhanden)

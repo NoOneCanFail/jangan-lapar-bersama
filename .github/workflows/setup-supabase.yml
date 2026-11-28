@@ -9,6 +9,14 @@ on:
       project_ref:
         description: "Supabase Project Reference oder Projekt-Adresse"
         required: true
+      aktion:
+        description: "Was tun?"
+        type: choice
+        default: einrichten
+        options:
+          - einrichten
+          - registrierung-schliessen
+          - registrierung-oeffnen
 
 permissions:
   contents: write
@@ -32,6 +40,7 @@ jobs:
           PROJECT_REF: ${{ inputs.project_ref }}
           APP_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
           ENV_FILE: .env.production
+          AKTION: ${{ inputs.aktion }}
         run: |
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then echo "::error::Secret SUPABASE_ACCESS_TOKEN fehlt."; exit 1; fi
           # Akzeptiert die Reference allein oder eine ganze Projekt-Adresse
@@ -39,6 +48,10 @@ jobs:
           if [ -z "$REF" ]; then echo "::error::Keine Project Reference (20 Zeichen) erkannt."; exit 1; fi
           echo "Project Reference: $REF"
           APP_URL=$(printf '%s' "$APP_URL" | tr 'A-Z' 'a-z')
+          case "$AKTION" in
+            registrierung-schliessen) export SIGNUPS=schliessen ;;
+            registrierung-oeffnen) export SIGNUPS=oeffnen ;;
+          esac
           node scripts/setup-supabase.mjs "$REF" "$APP_URL"
       # Auch bei Teilerfolg speichern, damit der öffentliche Push-Schlüssel nicht verloren geht.
       - name: Öffentliche Werte speichern
@@ -49,6 +62,7 @@ jobs:
           git add .env.production
           if git diff --cached --quiet; then echo "Keine Änderung."; else git commit -m "Supabase verbunden (öffentliche Werte)"; git push; fi
       - name: App neu veröffentlichen
+        if: ${{ inputs.aktion == 'einrichten' }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run deploy.yml --ref main

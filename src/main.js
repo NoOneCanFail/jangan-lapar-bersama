@@ -2,7 +2,7 @@ import "./style.css";
 import { AISLES, CUISINES, TYPES, SIDES, DISHES, BY, ING, PICKS, SOUPS, mainIng } from "./data.js";
 import {
   esc, ranked, shoppingGroups, fmt, packHint, expiryDate, shortDate, weekLabel, wishDish,
-  freezerCount, freeSlots, cleanOtp, validEmail, cleanPairCode, prettyPairCode, PORTIONS, FREEZER_CAP, HEAT,
+  freezerCount, freeSlots, validEmail, cleanPairCode, prettyPairCode, PORTIONS, FREEZER_CAP, HEAT,
 } from "./logic.js";
 import { isDemo, supabaseBackend, demoBackend, friendly } from "./backend.js";
 import { registerServiceWorker, pushStatus, enablePush, isIOS, isStandalone } from "./push.js";
@@ -14,7 +14,7 @@ const $sheet = document.getElementById("sheet");
 
 /* Bildschirmzustand (nicht gespeichert, außer ein paar Komfort-Einstellungen) */
 const ui = {
-  screen: "loading", email: "", codeSentAt: 0, error: "", busy: false,
+  screen: "loading", email: "", authMode: "login", error: "", busy: false,
   tab: "start", cookTab: "einkauf", filter: "Alle", picked: [], sheet: null, editFreezer: false,
   member: null, data: null, push: null,
 };
@@ -27,7 +27,7 @@ let unsubscribe = () => {};
 async function boot() {
   registerServiceWorker();
   const session = await api.session().catch(() => null);
-  if (!session) { ui.screen = ui.codeSentAt ? "code" : "email"; return render(); }
+  if (!session) { ui.screen = "email"; return render(); }
   await afterLogin();
 }
 
@@ -53,7 +53,7 @@ async function refresh() {
 }
 
 document.addEventListener("visibilitychange", () => { if (!document.hidden && ui.member?.me) refresh(); });
-api.onAuth(session => { if (!session && !["email", "code", "loading"].includes(ui.screen)) { ui.screen = "email"; render(); } });
+api.onAuth(session => { if (!session && !["email", "loading"].includes(ui.screen)) { ui.screen = "email"; render(); } });
 
 /** Führt eine Aktion aus, zeigt Fehler verständlich an und lädt danach neu. */
 async function act(fn, { ok, notify } = {}) {
@@ -94,7 +94,7 @@ function render() {
   $bar.innerHTML = ""; $sheet.innerHTML = "";
   const s = ui.screen;
   $app.innerHTML = s === "loading" ? `<div class="screen"><p class="muted">Lädt …</p></div>`
-    : s === "email" ? emailScreen() : s === "code" ? codeScreen() : s === "pair" ? pairScreen()
+    : s === "email" ? emailScreen() : s === "pair" ? pairScreen()
     : s === "join" ? joinScreen() : s === "waiting" ? waitingScreen() : s === "settings" ? settingsScreen() : appScreen();
   if (s === "app") {
     $bar.innerHTML = role() === "koch" ? cookBar() : "";
@@ -107,28 +107,20 @@ const brand = sub => `<div class="brand"><h1>Jangan Lapar Bersama</h1>${sub ? `<
 
 /* ---------- Login ---------- */
 function emailScreen() {
-  return `<form class="screen" id="f-email" novalidate>
+  const signup = ui.authMode === "signup";
+  return `<form class="screen" id="f-login" novalidate>
     ${brand()}
-    <h1>Anmelden</h1>
-    <p class="lead">Wir schicken dir einen Code per E-Mail. Ein Passwort brauchst du nicht.</p>
+    <h1>${signup ? "Konto anlegen" : "Anmelden"}</h1>
+    <p class="lead">${signup ? "Einmalig: E-Mail-Adresse und ein Passwort mit mindestens 8 Zeichen. Es wird keine E-Mail verschickt." : "Mit deiner E-Mail-Adresse und deinem Passwort."}</p>
     <div class="field"><label for="email">E-Mail-Adresse</label>
-      <input id="email" type="email" inputmode="email" autocomplete="email" required value="${esc(ui.email)}"></div>
+      <input id="email" type="email" inputmode="email" autocomplete="${signup ? "email" : "username"}" required value="${esc(ui.email)}"></div>
+    <div class="field"><label for="password">Passwort</label>
+      <input id="password" type="password" autocomplete="${signup ? "new-password" : "current-password"}" minlength="8" required></div>
     ${ui.error ? `<p class="err" role="alert">${esc(ui.error)}</p>` : ""}
-    <button class="cta" type="submit" ${ui.busy ? "disabled" : ""}><span>Code schicken</span></button>
-  </form>`;
-}
-function codeScreen() {
-  const wait = Math.max(0, 60 - Math.floor((Date.now() - ui.codeSentAt) / 1000));
-  return `<form class="screen" id="f-code" novalidate>
-    ${brand()}
-    <h1>Code eingeben</h1>
-    <p class="lead">Wir haben einen Code an <b>${esc(ui.email)}</b> geschickt. Schau auch im Spam-Ordner.</p>
-    <div class="field"><label for="otp">Code aus der E-Mail</label>
-      <input id="otp" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required></div>
-    ${ui.error ? `<p class="err" role="alert">${esc(ui.error)}</p>` : ""}
-    <button class="cta" type="submit" ${ui.busy ? "disabled" : ""}><span>Anmelden</span></button>
-    <p class="muted"><button type="button" class="link" id="resend" ${wait ? "disabled" : ""}>${wait ? `Neuer Code in ${wait} s` : "Neuen Code schicken"}</button>
-      · <button type="button" class="link" id="other-email">Andere E-Mail</button></p>
+    <button class="cta" type="submit" ${ui.busy ? "disabled" : ""}><span>${signup ? "Konto anlegen" : "Anmelden"}</span></button>
+    <p class="muted">${signup ? `Schon ein Konto? <button type="button" class="link" id="mode-login">Anmelden</button>`
+      : `Neu hier? <button type="button" class="link" id="mode-signup">Konto anlegen</button>`}</p>
+    ${signup ? "" : `<p class="muted">Passwort vergessen? Melde dich bei der Person, die die App eingerichtet hat.</p>`}
   </form>`;
 }
 
@@ -405,27 +397,21 @@ function toggleWish(id) {
 
 function bind() {
   // Login
-  on("#f-email", async e => {
+  on("#f-login", async e => {
     e.preventDefault();
     const email = document.getElementById("email").value.trim();
-    ui.email = email;
+    const password = document.getElementById("password").value;
+    ui.email = email; remember();
     if (!validEmail(email)) { ui.error = "Bitte eine gültige E-Mail-Adresse eingeben."; return render(); }
-    ui.busy = true; ui.error = ""; ui.email = email; remember(); render();
-    try { await api.sendCode(email); ui.codeSentAt = Date.now(); ui.screen = "code"; }
-    catch (err) { ui.error = friendly(err); }
-    ui.busy = false; render();
-    document.getElementById("otp")?.focus();
-  }, "submit");
-  on("#f-code", async e => {
-    e.preventDefault();
-    const token = cleanOtp(document.getElementById("otp").value);
-    if (token.length < 6) { ui.error = "Der Code hat 6 bis 8 Ziffern."; return render(); }
+    if (password.length < 8) { ui.error = "Das Passwort muss mindestens 8 Zeichen haben."; return render(); }
     ui.busy = true; ui.error = ""; render();
-    try { await api.verifyCode(ui.email, token); ui.codeSentAt = 0; ui.busy = false; await afterLogin(); }
-    catch (err) { ui.busy = false; ui.error = friendly(err); render(); }
+    try {
+      if (ui.authMode === "signup") await api.signUp(email, password); else await api.signIn(email, password);
+      ui.busy = false; await afterLogin();
+    } catch (err) { ui.busy = false; ui.error = friendly(err); render(); }
   }, "submit");
-  on("#resend", async () => { try { await api.sendCode(ui.email); ui.codeSentAt = Date.now(); toast("Neuer Code ist unterwegs."); } catch (e) { toast(friendly(e)); } render(); });
-  on("#other-email", () => { ui.screen = "email"; ui.codeSentAt = 0; ui.error = ""; render(); });
+  on("#mode-signup", () => { ui.authMode = "signup"; ui.error = ""; render(); });
+  on("#mode-login", () => { ui.authMode = "login"; ui.error = ""; render(); });
   on("#logout", async () => { unsubscribe(); await api.signOut(); ui.member = null; ui.data = null; ui.screen = "email"; render(); });
 
   // Koppeln
